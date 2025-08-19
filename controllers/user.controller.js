@@ -60,7 +60,7 @@ const createUser = async (req, res) => {
       message: "User created successfully.",
       user: {
         ...newUser,
-        password: undefined, // Exclude password from response
+        password: undefined,
       },
     });
   } catch (error) {
