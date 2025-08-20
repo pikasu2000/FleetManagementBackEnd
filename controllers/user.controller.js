@@ -16,9 +16,9 @@ const createUser = async (req, res) => {
       licenseNumber,
       emergencyContact,
     } = req.body;
-
+    // console.log(req.body);
     // Validate required fields
-    if (!username || !email || !phone || !password || !role || !name) {
+    if (!email || !phone || !password || !role || !name) {
       return res
         .status(400)
         .json({ message: "Please fill in all required fields." });
@@ -26,13 +26,11 @@ const createUser = async (req, res) => {
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
+    console.log(existingUser);
     if (existingUser) {
       return res.status(400).json({ message: "User already exists." });
     }
-    if (
-      role === "driver" &&
-      (!profile.licenseNumber || !profile.emergencyContact)
-    ) {
+    if (role === "driver" && (!licenseNumber || !emergencyContact)) {
       return res
         .status(400)
         .json({ message: "Please provide all driver profile fields." });
@@ -53,13 +51,13 @@ const createUser = async (req, res) => {
         emergencyContact,
       },
     });
-
+    console.log(newUser);
     await newUser.save();
     return res.status(201).json({
       success: true,
       message: "User created successfully.",
       user: {
-        ...newUser,
+        ...newUser.toObject(),
         password: undefined,
       },
     });
@@ -92,13 +90,14 @@ const loginUser = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
+
     if (!token) {
       return res.status(500).json({ message: "Failed to generate token." });
     }
 
     return res
       .status(200)
-      .json({ success: true, message: "Login successful.", token });
+      .json({ success: true, message: "Login successful.", token, user });
   } catch (error) {
     return res
       .status(500)
@@ -161,9 +160,101 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const getUsers = async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied. Admins only." });
+    }
+
+    const users = await User.find({ _id: { $ne: req.user.id } });
+    return res.status(200).json({
+      success: true,
+      message: "Users fetched successfully",
+      users,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ success: false, message: "Users failed fetched", error });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
+    }
+
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "User deleted successfully.",
+    });
+  } catch (error) {
+    console.error("Delete User Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+      error: error.message,
+    });
+  }
+};
+const editUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { username, email, phone, role, status, profile = {} } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    if (username) user.username = username;
+    if (email) user.email = email;
+    if (phone) user.phone = phone;
+    if (role) user.role = role;
+    if (status) user.status = status;
+
+    // Update profile fields 
+    if (!user.profile) user.profile = {}; // ensure profile exists
+    if (profile.name) user.profile.name = profile.name;
+    if (profile.address) user.profile.address = profile.address;
+    if (profile.licenseNumber)
+      user.profile.licenseNumber = profile.licenseNumber;
+    if (profile.emergencyContact)
+      user.profile.emergencyContact = profile.emergencyContact;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully.",
+      user,
+    });
+  } catch (error) {
+    console.error("Edit User Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createUser,
   loginUser,
   forgotPassword,
   resetPassword,
+  getUsers,
+  deleteUser,
+  editUser,
 };
