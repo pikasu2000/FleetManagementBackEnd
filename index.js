@@ -3,12 +3,19 @@ const app = express();
 const cors = require("cors");
 require("dotenv").config();
 const connectDB = require("./config/db");
+
+// All routes Link
 const UserRouter = require("./routes/user.route");
+const VehicleRouter = require("./routes/vehicle.route");
+const TripRouter = require("./routes/trip.route");
+// const createDefaultAdmin = require("./utils/adminCreate");
+
 app.use(express.json());
 
-// const createDefaultAdmin = require("./utils/adminCreate");
 app.use(cors());
 app.use("/api/users", UserRouter);
+app.use("/api/vehicles", VehicleRouter);
+app.use("/api/trips", TripRouter);
 
 app.get("/", (req, res) => {
   res.send("Welcome to the Fleet Management API");
