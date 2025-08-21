@@ -1,7 +1,7 @@
 const {
   createVehicle,
   getAllVehicles,
-  editVehicle,
+  updateVehicle,
   deleteVehicle,
 } = require("../controllers/vehicle.controller");
 const express = require("express");
@@ -21,7 +21,7 @@ router.put(
   "/:id",
   authMiddleware,
   roleMiddleware("admin", "manager"),
-  editVehicle
+  updateVehicle
 );
 router.delete(
   "/:id",

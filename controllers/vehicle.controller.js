@@ -44,7 +44,11 @@ const createVehicle = async (req, res) => {
 
 const getAllVehicles = async (req, res) => {
   try {
-    const vehicles = await VehicleModel.find();
+    const vehicles = await VehicleModel.find().populate(
+      "assignedDriver",
+      "username profile.name email role"
+    );
+
     res.status(200).json({ success: true, vehicles });
   } catch (error) {
     console.error("Error fetching vehicles:", error);
@@ -56,16 +60,27 @@ const getAllVehicles = async (req, res) => {
   }
 };
 
-const editVehicle = async (req, res) => {
+const updateVehicle = async (req, res) => {
   try {
     const vehicleId = req.params.id;
-    const updatedData = req.body;
+    const updatedData = { ...req.body };
 
+    // Optional: Clean up assignedDriver field
+    if (updatedData.assignedDriver) {
+      if (
+        typeof updatedData.assignedDriver === "object" &&
+        updatedData.assignedDriver._id
+      ) {
+        updatedData.assignedDriver = updatedData.assignedDriver._id;
+      }
+    }
+
+    // Just update with whatever fields are provided
     const updatedVehicle = await VehicleModel.findByIdAndUpdate(
       vehicleId,
       updatedData,
-      { new: true }
-    );
+      { new: true, runValidators: true }
+    ).populate("assignedDriver", "username profile.name email role");
 
     if (!updatedVehicle) {
       return res.status(404).json({
@@ -88,7 +103,6 @@ const editVehicle = async (req, res) => {
     });
   }
 };
-
 const deleteVehicle = async (req, res) => {
   try {
     const vehicleId = req.params.id;
@@ -120,6 +134,6 @@ const deleteVehicle = async (req, res) => {
 module.exports = {
   createVehicle,
   getAllVehicles,
-  editVehicle,
+  updateVehicle,
   deleteVehicle,
 };
