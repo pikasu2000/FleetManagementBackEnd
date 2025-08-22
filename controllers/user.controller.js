@@ -16,7 +16,7 @@ const createUser = async (req, res) => {
       licenseNumber,
       emergencyContact,
     } = req.body;
-    // console.log(req.body);
+    console.log(req.body);
     // Validate required fields
     if (!email || !phone || !password || !role || !name) {
       return res
@@ -24,7 +24,6 @@ const createUser = async (req, res) => {
         .json({ message: "Please fill in all required fields." });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     console.log(existingUser);
     if (existingUser) {
@@ -104,6 +103,26 @@ const loginUser = async (req, res) => {
       .json({ success: false, message: "Login Failed", error });
   }
 };
+const getCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Current user fetched successfully",
+      user,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
 
 const forgotPassword = async (req, res) => {
   try {
@@ -162,20 +181,29 @@ const resetPassword = async (req, res) => {
 
 const getUsers = async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Access denied. Admins only." });
+    const userRole = req.user.role;
+
+    if (userRole !== "admin" && userRole !== "manager") {
+      return res.status(403).json({ message: "Access denied." });
     }
 
-    const users = await User.find({ _id: { $ne: req.user.id } });
+    let users = await User.find({ _id: { $ne: req.user.id } });
+
+    if (userRole === "manager") {
+      users = users.filter((u) => u.role == "driver");
+    }
+
     return res.status(200).json({
       success: true,
       message: "Users fetched successfully",
       users,
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ success: false, message: "Users failed fetched", error });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+      error: error.message || error,
+    });
   }
 };
 
@@ -223,7 +251,7 @@ const editUser = async (req, res) => {
     if (role) user.role = role;
     if (status) user.status = status;
 
-    // Update profile fields 
+    // Update profile fields
     if (!user.profile) user.profile = {}; // ensure profile exists
     if (profile.name) user.profile.name = profile.name;
     if (profile.address) user.profile.address = profile.address;
@@ -257,4 +285,5 @@ module.exports = {
   getUsers,
   deleteUser,
   editUser,
+  getCurrentUser,
 };

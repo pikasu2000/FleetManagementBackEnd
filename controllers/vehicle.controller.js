@@ -131,9 +131,47 @@ const deleteVehicle = async (req, res) => {
   }
 };
 
+// Assign driver to a vehicle
+const AssignDriver = async (req, res) => {
+  try {
+    const { vehicleId, driverId } = req.body;
+
+    const driver = await User.findById(driverId);
+    if (!driver) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Driver not found" });
+    }
+
+    const vehicle = await Vehicle.findById(vehicleId);
+    if (!vehicle) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vehicle not found" });
+    }
+
+    vehicle.assignedDriver = driverId;
+    await vehicle.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Driver assigned successfully",
+      vehicle,
+    });
+  } catch (error) {
+    console.error("Error assigning driver:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while assigning driver",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createVehicle,
   getAllVehicles,
   updateVehicle,
   deleteVehicle,
+  AssignDriver
 };
