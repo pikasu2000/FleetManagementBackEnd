@@ -21,7 +21,30 @@ const createTrip = async (req, res) => {
 
 const viewTrips = async (req, res) => {
   try {
-    const trips = await TripModel.find();
+    const userRole = req.user.role;
+    const userId = req.user._id.toString();
+    console.log("Logged in user:", req.user);
+
+    let trips;
+
+    if (userRole === "admin" || userRole === "manager") {
+      trips = await TripModel.find()
+        .populate({ path: "vehicleId", select: "make model licensePlate" })
+        .populate({ path: "driverId", select: "username profile" });
+    } else if (userRole === "driver") {
+      // Drivers see only their trips
+      trips = await TripModel.find({
+        $expr: {
+          $eq: [{ $toString: "$driverId" }, userId], // convert driverId to string
+        },
+      })
+        .populate({ path: "vehicleId", select: "make model licensePlate" })
+        .populate({ path: "driverId", select: "username profile" });
+    } else {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
+    console.log("Trips found:", trips.length);
     res.status(200).json({ success: true, trips });
   } catch (error) {
     console.error("Error fetching trips:", error);
@@ -32,18 +55,11 @@ const viewTrips = async (req, res) => {
     });
   }
 };
-
-const getTripById = async (req, res) => {
+const deleteTrip = async (req, res) => {
   try {
     const tripId = req.params.id;
-    const trip = await TripModel.findById(tripId);
 
-    if (!trip) {
-      return res.status(404).json({
-        success: false,
-        message: "Trip not found",
-      });
-    }
+    const trip = await TripModel.findByIdAndDelete(tripId);
 
     res.status(200).json({ success: true, trip });
   } catch (error) {
@@ -59,5 +75,6 @@ const getTripById = async (req, res) => {
 module.exports = {
   createTrip,
   viewTrips,
-  getTripById,
+
+  deleteTrip,
 };

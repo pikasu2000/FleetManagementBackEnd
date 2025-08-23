@@ -1,17 +1,22 @@
 const jwt = require("jsonwebtoken");
-
-const authMiddleware = (req, res, next) => {
+const UserModel = require('../models/User.model')
+const authMiddleware = async (req, res, next) => {
   const token = req.headers["authorization"]?.split(" ")[1];
-//   console.log("auth token", token);
+
   if (!token) {
     return res.status(401).json({ message: "Unauthorized User" });
   }
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-    req.user = decoded;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await UserModel.findById(decoded.id);
+    console.log(user);
+    if (!user) return res.status(401).json({ message: "Unauthorized User" });
+
+    req.user = user;
     next();
-  });
+  } catch (err) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
 };
 module.exports = authMiddleware;

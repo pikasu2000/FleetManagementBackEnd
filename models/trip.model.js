@@ -17,6 +17,8 @@ const TripSchema = new mongoose.Schema(
     startTime: { type: Date, required: true },
     endTime: { type: Date },
     distance: { type: Number },
+    status: { type: String, enum: ["ongoing", "completed", "canceled"] },
+    tripType: { type: String, enum: ["delivery", "passenger", "personal"] },
     purpose: { type: String },
     fuelUsed: { type: Number },
   },

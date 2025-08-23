@@ -4,6 +4,7 @@ const {
   updateVehicle,
   deleteVehicle,
   AssignDriver,
+  VehicleByID,
 } = require("../controllers/vehicle.controller");
 
 const express = require("express");
@@ -23,6 +24,12 @@ router.get(
   authMiddleware,
   roleMiddleware("admin", "manager", "driver"),
   getAllVehicles
+);
+router.get(
+  "/:id",
+  authMiddleware,
+  roleMiddleware("admin", "manager", "driver"),
+  VehicleByID
 );
 
 router.put(

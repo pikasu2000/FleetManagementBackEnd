@@ -131,10 +131,39 @@ const deleteVehicle = async (req, res) => {
   }
 };
 
+const VehicleByID = async (req, res) => {
+  try {
+    const vehicleId = req.params.id;
+
+    const vehicle = await VehicleModel.findById(vehicleId).populate(
+      "assignedDriver"
+    );
+
+    if (!vehicle) {
+      return res.status(404).json({
+        success: false,
+        message: "Vehicle not found",
+      });
+    }
+    res.status(200).json({
+      success: true,
+      vehicle,
+    });
+  } catch (error) {
+    console.error("Error fetching vehicle:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch vehicle",
+      error: error.message,
+    });
+  }
+};
+
 // Assign driver to a vehicle
 const AssignDriver = async (req, res) => {
   try {
-    const { vehicleId, driverId } = req.body;
+    const vehicleId = req.params.id;
+    const { driverId } = req.body;
 
     const driver = await User.findById(driverId);
     if (!driver) {
@@ -143,7 +172,7 @@ const AssignDriver = async (req, res) => {
         .json({ success: false, message: "Driver not found" });
     }
 
-    const vehicle = await Vehicle.findById(vehicleId);
+    const vehicle = await VehicleModel.findById(vehicleId);
     if (!vehicle) {
       return res
         .status(404)
@@ -173,5 +202,6 @@ module.exports = {
   getAllVehicles,
   updateVehicle,
   deleteVehicle,
-  AssignDriver
+  VehicleByID,
+  AssignDriver,
 };
