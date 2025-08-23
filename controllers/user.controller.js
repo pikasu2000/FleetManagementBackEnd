@@ -2,6 +2,8 @@ const User = require("../models/User.model");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const sendMail = require("../utils/mail");
+const logActivity = require("../utils/logActivity");
+
 // it only admin can create
 const createUser = async (req, res) => {
   try {
@@ -52,6 +54,12 @@ const createUser = async (req, res) => {
     });
     console.log(newUser);
     await newUser.save();
+    await logActivity({
+      type: "user_created",
+      message: `Created ${newUser.role} ${newUser.username}`,
+      userId: newUser._id,
+    });
+
     return res.status(201).json({
       success: true,
       message: "User created successfully.",

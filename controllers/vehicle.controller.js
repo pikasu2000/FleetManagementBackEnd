@@ -1,6 +1,6 @@
 const VehicleModel = require("../models/Vehicle.model");
 const User = require("../models/User.model");
-
+const logActivity = require("../utils/logActivity");
 // Manager and admin can only add vehicle
 const createVehicle = async (req, res) => {
   try {
@@ -29,6 +29,12 @@ const createVehicle = async (req, res) => {
     });
 
     await newVehicle.save();
+    await logActivity({
+      type: "vehicle_created",
+      message: `Created vehicle ${newVehicle.make} ${newVehicle.model}`,
+      vehicleId: newVehicle._id,
+      driverId: newVehicle.assignedDriver,
+    });
     res
       .status(201)
       .json({ message: "Vehicle created successfully", vehicle: newVehicle });
@@ -44,10 +50,9 @@ const createVehicle = async (req, res) => {
 
 const getAllVehicles = async (req, res) => {
   try {
-    const vehicles = await VehicleModel.find().populate(
-      "assignedDriver",
-      "username profile.name email role"
-    );
+    const vehicles = await VehicleModel.find()
+      .populate("assignedDriver", "username profile.name email role")
+      .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, vehicles });
   } catch (error) {
@@ -88,6 +93,12 @@ const updateVehicle = async (req, res) => {
         message: "Vehicle not found",
       });
     }
+    await logActivity({
+      type: "vehicle_edited",
+      message: `Edited vehicle: ${updatedVehicle.make} ${updatedVehicle.model}`,
+      userId: req.user._id,
+      vehicleId: updatedVehicle._id,
+    });
 
     res.status(200).json({
       success: true,
