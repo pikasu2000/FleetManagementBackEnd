@@ -2,7 +2,7 @@ const User = require("../models/User.model");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const sendMail = require("../utils/mail");
-const logActivity = require("../utils/logActivity");
+const { logActivity, initSocketIO } = require("../utils/logActivity");
 
 // it only admin can create
 const createUser = async (req, res) => {
@@ -44,7 +44,7 @@ const createUser = async (req, res) => {
       email,
       phone,
       password: hashPassword,
-      role: "user",
+      role,
       profile: {
         name,
         address,
@@ -54,11 +54,15 @@ const createUser = async (req, res) => {
     });
     console.log(newUser);
     await newUser.save();
-    await logActivity({
-      type: "user_created",
-      message: `Created ${newUser.role} ${newUser.username}`,
-      userId: newUser._id,
-    });
+    try {
+      await logActivity({
+        type: "user_created",
+        message: `Created ${newUser.role} ${newUser.username}`,
+        userId: newUser._id,
+      });
+    } catch (logErr) {
+      console.error("Failed to log activity", logErr);
+    }
 
     return res.status(201).json({
       success: true,
@@ -291,7 +295,9 @@ const getUsers = async (req, res) => {
       return res.status(403).json({ message: "Access denied." });
     }
 
-    let users = await User.find({ _id: { $ne: req.user.id } }).sort({ createdAt: -1 });
+    let users = await User.find({ _id: { $ne: req.user.id } }).sort({
+      createdAt: -1,
+    });
 
     if (userRole === "manager") {
       users = users.filter((u) => u.role == "driver");

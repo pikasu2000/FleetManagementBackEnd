@@ -65,9 +65,9 @@ const createTrip = async (req, res) => {
 const updateTripStatus = async (req, res) => {
   try {
     const { tripId } = req.params;
-    const { updates } = req.body;
+    const { driverId, action, updates } = req.body;
     const user = req.user;
-    console.log("User in updateTripStatus:", req.body);
+
     if (!tripId) return res.status(400).json({ message: "Trip ID required" });
 
     const trip = await TripModel.findById(tripId);
@@ -85,7 +85,6 @@ const updateTripStatus = async (req, res) => {
           .status(403)
           .json({ message: "You are not assigned to this trip" });
       }
-
       if (action === "accept") {
         trip.driverAccepted = "accepted";
         trip.status = "ongoing";
@@ -96,16 +95,30 @@ const updateTripStatus = async (req, res) => {
         return res.status(400).json({ message: "Invalid action" });
       }
 
-   
+      // Manager/Admin arbitrary updates
     } else if (updates && ["manager", "admin"].includes(user.role)) {
       Object.assign(trip, updates);
+
+      // User cancel their own trip
+    } else if (updates && user.role === "user") {
+      if (updates.status === "canceled") {
+        if (trip.userId.toString() !== user._id.toString()) {
+          return res
+            .status(403)
+            .json({ message: "You can only cancel your own trip" });
+        }
+        trip.status = "canceled";
+      } else {
+        return res
+          .status(403)
+          .json({ message: "Users can only cancel their trips" });
+      }
     } else {
       return res.status(400).json({ message: "Invalid operation" });
     }
 
     await trip.save();
     const populatedTrip = await trip.populate("vehicleId driverId userId");
-
     req.app.get("io")?.emit("tripUpdated", populatedTrip);
 
     res.status(200).json({
