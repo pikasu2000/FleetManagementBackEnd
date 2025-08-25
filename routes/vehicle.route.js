@@ -3,7 +3,7 @@ const {
   getAllVehicles,
   updateVehicle,
   deleteVehicle,
-  AssignDriver,
+
   VehicleByID,
 } = require("../controllers/vehicle.controller");
 
@@ -22,13 +22,13 @@ router.post(
 router.get(
   "/",
   authMiddleware,
-  roleMiddleware("admin", "manager", "driver"),
+  roleMiddleware("admin", "manager", "driver", "user"),
   getAllVehicles
 );
 router.get(
   "/:id",
   authMiddleware,
-  roleMiddleware("admin", "manager", "driver"),
+  roleMiddleware("admin", "manager", "driver", "user"),
   VehicleByID
 );
 
@@ -39,12 +39,6 @@ router.put(
   updateVehicle
 );
 
-router.put(
-  "/assign-driver/:id",
-  authMiddleware,
-  roleMiddleware("admin", "manager"),
-  AssignDriver
-);
 router.delete("/:id", authMiddleware, roleMiddleware("admin"), deleteVehicle);
 
 module.exports = router;

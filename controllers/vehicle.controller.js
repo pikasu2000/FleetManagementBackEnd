@@ -53,7 +53,7 @@ const getAllVehicles = async (req, res) => {
     const vehicles = await VehicleModel.find()
       .populate("assignedDriver", "username profile.name email role")
       .sort({ createdAt: -1 });
-
+    // console.log("Fetched vehicles:", vehicles);
     res.status(200).json({ success: true, vehicles });
   } catch (error) {
     console.error("Error fetching vehicles:", error);
@@ -126,7 +126,12 @@ const deleteVehicle = async (req, res) => {
         message: "Vehicle not found",
       });
     }
-
+    await logActivity({
+      type: "Manager_response",
+      message: `${deletedVehicle.licensePlate} deleted`,
+      userId: req.user?._id,
+      vehicleId,
+    });
     res.status(200).json({
       success: true,
       message: "Vehicle deleted successfully",
@@ -170,49 +175,10 @@ const VehicleByID = async (req, res) => {
   }
 };
 
-// Assign driver to a vehicle
-const AssignDriver = async (req, res) => {
-  try {
-    const vehicleId = req.params.id;
-    const { driverId } = req.body;
-
-    const driver = await User.findById(driverId);
-    if (!driver) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Driver not found" });
-    }
-
-    const vehicle = await VehicleModel.findById(vehicleId);
-    if (!vehicle) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Vehicle not found" });
-    }
-
-    vehicle.assignedDriver = driverId;
-    await vehicle.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Driver assigned successfully",
-      vehicle,
-    });
-  } catch (error) {
-    console.error("Error assigning driver:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error while assigning driver",
-      error: error.message,
-    });
-  }
-};
-
 module.exports = {
   createVehicle,
   getAllVehicles,
   updateVehicle,
   deleteVehicle,
   VehicleByID,
-  AssignDriver,
 };

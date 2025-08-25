@@ -12,7 +12,7 @@ const VehicleSchema = new mongoose.Schema(
       enum: ["active", "maintenance", "retired"],
       default: "active",
     },
-    assignedDriver: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
     location: {
       type: String,
     },
@@ -24,6 +24,11 @@ const VehicleSchema = new mongoose.Schema(
         cost: { type: Number },
       },
     ],
+    assignedDriver: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { timestamps: true }
 );

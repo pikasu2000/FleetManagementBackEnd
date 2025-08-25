@@ -1,80 +1,192 @@
 const TripModel = require("../models/trip.model");
+const mongoose = require("mongoose");
+// 🔹 Common query builder
+const getTrips = async (filter = {}) => {
+  return TripModel.find(filter)
+    .populate("vehicleId", "make model licensePlate")
+    .populate("driverId", "username profile")
+    .populate("userId", "username email")
+    .sort({ createdAt: -1 });
+};
 
+// 🔹 Create a trip
 const createTrip = async (req, res) => {
   try {
-    const tripData = req.body;
-    console.log(tripData);
-    const newTrip = new TripModel(tripData);
-    await newTrip.save();
-    res
-      .status(201)
-      .json({ message: "Trip created successfully", trip: newTrip });
-  } catch (error) {
-    console.error("Error creating trip:", error);
-    res.status(500).json({
-      success: false,
-      message: "Trip Add Failed",
-      error: error.message,
-    });
-  }
-};
+    const {
+      vehicleId,
+      startLocation,
+      endLocation,
+      startTime,
+      endTime,
+      distance,
+      fuelUsed,
+      tripType,
+      purpose,
+    } = req.body;
 
-const viewTrips = async (req, res) => {
-  try {
-    const userRole = req.user.role;
-    const userId = req.user._id.toString();
-    console.log("Logged in user:", req.user);
-
-    let trips;
-
-    if (userRole === "admin" || userRole === "manager") {
-      trips = await TripModel.find()
-        .populate({ path: "vehicleId", select: "make model licensePlate" })
-        .populate({ path: "driverId", select: "username profile" });
-    } else if (userRole === "driver") {
-      // Drivers see only their trips
-      trips = await TripModel.find({
-        $expr: {
-          $eq: [{ $toString: "$driverId" }, userId], // convert driverId to string
-        },
-      })
-        .populate({ path: "vehicleId", select: "make model licensePlate" })
-        .populate({ path: "driverId", select: "username profile" });
-    } else {
-      return res.status(403).json({ message: "Access denied." });
+    if (
+      !vehicleId ||
+      !startLocation ||
+      !endLocation ||
+      !startTime ||
+      !tripType
+    ) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    console.log("Trips found:", trips.length);
-    res.status(200).json({ success: true, trips });
-  } catch (error) {
-    console.error("Error fetching trips:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch trips",
-      error: error.message,
+    const tripData = {
+      userId: req.user._id,
+      vehicleId,
+      startLocation,
+      endLocation,
+      startTime,
+      endTime: endTime || null,
+      distance: distance || null,
+      fuelUsed: fuelUsed || null,
+      tripType,
+      purpose,
+      status: "pending",
+      driverId: null,
+    };
+    // console.log("Creating trip:", req.body);
+    const newTrip = await TripModel.create(tripData);
+
+    res.status(201).json({
+      success: true,
+      message: "Trip requested successfully",
+      trip: await newTrip.populate("vehicleId driverId userId"),
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// 🔹 Update trip (assign driver or respond)
+const updateTripStatus = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const { updates } = req.body;
+    const user = req.user;
+    console.log("User in updateTripStatus:", req.body);
+    if (!tripId) return res.status(400).json({ message: "Trip ID required" });
+
+    const trip = await TripModel.findById(tripId);
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
+
+    // Manager/Admin assigns driver
+    if (driverId && ["manager", "admin"].includes(user.role)) {
+      trip.driverId = driverId;
+      trip.status = "assigned";
+
+      // Driver accepts/rejects
+    } else if (action && user.role === "driver") {
+      if (!trip.driverId || trip.driverId.toString() !== user._id.toString()) {
+        return res
+          .status(403)
+          .json({ message: "You are not assigned to this trip" });
+      }
+
+      if (action === "accept") {
+        trip.driverAccepted = "accepted";
+        trip.status = "ongoing";
+      } else if (action === "reject") {
+        trip.driverAccepted = "rejected";
+        trip.status = "canceled";
+      } else {
+        return res.status(400).json({ message: "Invalid action" });
+      }
+
+   
+    } else if (updates && ["manager", "admin"].includes(user.role)) {
+      Object.assign(trip, updates);
+    } else {
+      return res.status(400).json({ message: "Invalid operation" });
+    }
+
+    await trip.save();
+    const populatedTrip = await trip.populate("vehicleId driverId userId");
+
+    req.app.get("io")?.emit("tripUpdated", populatedTrip);
+
+    res.status(200).json({
+      success: true,
+      message: "Trip updated successfully",
+      trip: populatedTrip,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// For admin and Mnager
+const viewAllTrips = async (req, res) => {
+  try {
+    const { role } = req.user;
+
+    if (!["admin", "manager"].includes(role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const trips = await getTrips();
+    res.status(200).json({ success: true, trips });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// for users
+const viewUserTrips = async (req, res) => {
+  try {
+    const { role, _id } = req.user;
+
+    if (role !== "user") {
+      return res.status(403).json({ message: "Only users can view this" });
+    }
+    // console.log();
+    const trips = await getTrips({ userId: new mongoose.Types.ObjectId(_id) });
+
+    res.status(200).json({ success: true, trips });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// for driver
+const viewDriverTrips = async (req, res) => {
+  try {
+    const { role, _id } = req.user;
+
+    if (role !== "driver") {
+      return res.status(403).json({ message: "Only drivers can view this" });
+    }
+
+    const trips = await getTrips({
+      driverId: new mongoose.Types.ObjectId(_id),
+    });
+    res.status(200).json({ success: true, trips });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 🔹 Delete trip
 const deleteTrip = async (req, res) => {
   try {
-    const tripId = req.params.id;
-
-    const trip = await TripModel.findByIdAndDelete(tripId);
+    const trip = await TripModel.findByIdAndDelete(req.params.id);
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
 
     res.status(200).json({ success: true, trip });
   } catch (error) {
-    console.error("Error fetching trip:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch trip",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 module.exports = {
   createTrip,
-  viewTrips,
-
+  updateTripStatus,
+  viewUserTrips,
+  viewDriverTrips,
+  viewAllTrips,
   deleteTrip,
 };
